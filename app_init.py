@@ -1,22 +1,16 @@
 from os import environ
+from secrets import token_urlsafe
 from time import time
-
+from typing import List
 
 from flask import Flask, Response, request, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from floodgate import guard
+from sqlalchemy.orm import validates
 
-
-from constants import IS_PROD, FLASK_SECRET, DATABASE_URL
+from constants import DATABASE_URL, FLASK_SECRET, IS_PROD
 from danger import check_password_hash, generate_password_hash
-
-from util import (
-    AppException,
-    get_origin,
-    json_response,
-    sanitize,
-)
-
+from util import AppException, get_origin, json_response, sanitize
 
 app = Flask(__name__)
 app.secret_key = FLASK_SECRET
@@ -33,7 +27,7 @@ db = SQLAlchemy(app)
 
 
 @app.before_request
-@guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=3, per=1)
+@guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=15, per=5)
 def gate_check():
     pass
 
@@ -80,6 +74,8 @@ class UserTable(db.Model):
     name: str = db.Column(db.String(30), nullable=False)
     password_hash: str = db.Column(db.String, nullable=False)
     created_at: int = db.Column(db.Integer)
+    files: List = db.relationship("File", backref="enc", lazy=True)
+    info_dict_id: str = db.Column(db.String)
     # pylint: enable=E1101
 
     @property
@@ -88,22 +84,28 @@ class UserTable(db.Model):
             "name": self.name,
             "user": self.user,
             "created_at": self.created_at,
-            "_secure_": {},
+            "_secure_": {"info_dict_id": self.info_dict_id},
         }
 
-    def _validate_user(self, user: str):
+    @validates("user")
+    def _validate_user(self, _key, user: str):
         length = len(user)
         if length > 30:
-            raise AppException("Username cannot be longer than 30 characters")
-        # if length < 4:
-        #     raise AppException("Username cannot be shorter than 4 characters")
+            raise AppException("Username cannot be longer than 30 characters", 400)
+        if length < 4:
+            raise AppException("Username cannot be shorter than 4 characters", 400)
         if sanitize(user) != user:
-            raise AppException("Username cannot have special characters or whitespace")
+            raise AppException(
+                "Username cannot have special characters or whitespace", 400
+            )
+        return user
 
-    def _validate_password(self, password: str):
+    @validates("password_hash")
+    def _validate_password(self, _key, password: str):
         length = len(password)
         if length < 4:
-            raise AppException("Password cannot be shorter than 4 characters")
+            raise AppException("Password cannot be shorter than 4 characters", 400)
+        return generate_password_hash(password)
 
     def __init__(
         self,
@@ -111,46 +113,59 @@ class UserTable(db.Model):
         name: str = None,
         password: str = None,
         created_at: int = None,
+        info_dict_id: str = None,
     ):
         raise_if_invalid_data(user, name, password)
         self.user = user.lower()
         self.name = name
         self.password_hash = password
+        self.info_dict_id = None
 
-    def _is_same_value(self, key: str, val) -> bool:
-        if hasattr(self, key):
-            previous_value = super().__getattribute__(key)
 
-            return (
-                (previous_value and check_password_hash(previous_value, val))
-                if key == "password_hash"
-                else previous_value == val
-            )
+ENCRYPTED_JSON = "encrypted_json"
+ENCRYPTED_BLOB = "encrypted_blob"
 
-    def __setattr__(self, key: str, val):
-        """Checks for data type validity before passing it to
-            the database
-        Args:
-            key (str)
-            val (Any)
-        Raises:
-            ValueError: An error when the passed data doesn't satisfy the constraints.
-                        It can be wrapped in str() and returned back to client
-        """
-        # if the value is same, don't attempt any SQL operation
-        if self._is_same_value(key, val):
-            return
 
-        if key == "password_hash":
-            self._validate_password(val)
-            val = generate_password_hash(val)
-        else:
-            if key == "user":
-                self._validate_user(val)
+class File(db.Model):
+    # pylint: disable=E1101
+    owner_user: str = db.Column(
+        db.String(30), db.ForeignKey(UserTable.user, ondelete="cascade")
+    )
+    file_enc_meta: str = db.Column(db.String, nullable=False)
+    binary: bytes = db.Column(db.LargeBinary, nullable=False)
+    file_id: str = db.Column(db.String, primary_key=True)
+    data_type: str = db.Column(db.String(20), nullable=False)
+    # pylint: enable=E1101
+    def __init__(
+        self,
+        owner_user: str = None,
+        file_enc_meta: str = None,
+        binary: bytes = None,
+        data_type: str = None,
+    ):
+        raise_if_invalid_data(owner_user, file_enc_meta, binary, data_type)
+        self.owner_user = owner_user
+        self.file_enc_meta = file_enc_meta
+        self.binary = binary
+        self.file_id = token_urlsafe(30)
+        self.data_type = data_type
 
-        super().__setattr__(key, val)
+    @property
+    def as_json(self):
+        return {
+            "file_enc_meta": self.file_enc_meta,
+            "owner": self.owner_user,
+            "file_id": self.file_id,
+            "data_type": self.data_type,
+        }
+
+    @validates("data_type")
+    def _validate_data_type(self, _k, t: str):
+        if t in (ENCRYPTED_JSON, ENCRYPTED_BLOB):
+            return t
+        raise AppException("Invalid value for 'data_type'", 400)
 
 
 def raise_if_invalid_data(*args):
     if any(not x or not ((x).strip() if isinstance(x, str) else True) for x in args):
-        raise AppException("Invalid Data")
+        raise AppException("Invalid Data", 400)

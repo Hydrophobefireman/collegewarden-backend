@@ -46,11 +46,10 @@ def user_details(user):
     return users.get_user_details(ParsedRequest(), user)
 
 
-# edit user info, only authenticated requests allowed
-@app.route("/accounts/<user>/edit/", **POST_REQUEST)
+@app.route("/accounts/<user>/files/",strict_slashes=False)
 @api_response
-def edit_user(user):
-    return users.edit(ParsedRequest(), user)
+def get_files(user):
+    return users.get_file_list(ParsedRequest(), user)
 
 
 @app.route("/logout/", strict_slashes=False)

@@ -33,7 +33,7 @@ def regenerate_access_token(refresh: dict) -> dict:
     user = refresh.get("user")
     integrity = refresh.get("integrity")
     data = get_user_by_id(user)
-    current = integrity(data.user, data.password_hash)
+    current = get_integrity(data.user, data.password_hash)
     if check(integrity, current):
         return (
             issue_access_token(user),
@@ -65,18 +65,18 @@ def get_token(strict=True):
 
     if not received_access_token:
         if strict:
-            raise AppException("No authentication provided")
+            raise AppException("No authentication provided", 401)
         return None
     try:
         access = decode(received_access_token)
     except Exception:
         if strict:
-            raise AppException("invalid token")
+            raise AppException("invalid token", 401)
         return None
 
     if access is None:
         if strict:
-            raise AppException("refresh")
+            raise AppException("refresh", 401)
         return None
 
     return access

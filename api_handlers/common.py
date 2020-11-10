@@ -1,6 +1,6 @@
 from sqlalchemy import func as _func
 
-from app_init import UserTable as _U
+from app_init import UserTable as _U, File as _F
 from app_init import db as _db
 from util import AppException as _AppException
 from util import sanitize
@@ -23,10 +23,10 @@ def save_to_db():
     _db.session.commit()
 
 
-# def delete_from_db(d, batch=False):
-#     if d:
-#         _db.session.delete(d)
-#         not batch and save_to_db()
+def delete_from_db(d, batch=False):
+    if d:
+        _db.session.delete(d)
+        not batch and save_to_db()
 
 
 def get_user_by_id(idx: str) -> _U:
@@ -35,9 +35,15 @@ def get_user_by_id(idx: str) -> _U:
     return _assert_exists(_U.query.filter(lower(_U.user) == lower(idx)).first())
 
 
+def get_file_by_id(idx: str) -> _F:
+    if not idx:
+        return _assert_exists(None)
+    return _assert_exists(_F.query.filter_by(file_id=idx).first())
+
+
 def _assert_exists(user: _U, name="User"):
     if user is None:
-        raise _AppException(f"{name} does not exist")
+        raise _AppException(f"{name} does not exist", code=404)
     return user
 
 

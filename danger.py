@@ -65,7 +65,7 @@ def decode_token(data: str) -> dict:
     except _EXPIRED:
         return None
     except:
-        raise AppException("Invalid token")
+        raise AppException("Invalid token", 400)
 
 
 # =======================================================================

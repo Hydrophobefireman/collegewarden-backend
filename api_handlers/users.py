@@ -19,6 +19,7 @@ from danger import (
 from util import AppException
 from util import ParsedRequest as _Parsed
 from util import json_response
+from util import get_bearer_token
 
 from .common import add_to_db, get_user_by_id, save_to_db
 from .cred_manager import CredManager
@@ -34,10 +35,10 @@ def register(request: _Parsed):
     try:
         user_data = UserTable(user, name, password)
         add_to_db(user_data)
-        return user_data.as_json
+        return {"user_data": user_data.as_json}
     except Exception as e:
         if isinstance(getattr(e, "orig", None), IntegrityError):
-            raise AppException("User exists")
+            raise AppException("User exists", 409)
         raise e
 
 
@@ -52,24 +53,24 @@ def login(request: _Parsed):
     if not password:
         invalids.append("password")
     if invalids:
-        raise AppException(f"Invalid {' and '.join(invalids)}")
+        raise AppException(f"Invalid {' and '.join(invalids)}", code=401)
     user_data = get_user_by_id(user)
     password_hash = user_data.password_hash
     if not check_password_hash(password_hash, password):
-        raise AppException("Incorrect Password")
+        raise AppException("Incorrect Password", code=401)
     username = user_data.user
     access_token = create_token(issue_access_token(username))
     refresh_token = create_token(issue_refresh_token(username, password_hash))
 
     return json_response(
-        {"success": True, "user_data": user_data.as_json},
+        {"data": {"success": True, "user_data": user_data.as_json}},
         headers={"x-access-token": access_token, "x-refresh-token": refresh_token},
     )
 
 
 def re_authenticate(req: _Parsed):
     headers = flask_request.headers
-    access_token = headers.get("x-access-token")
+    access_token = get_bearer_token(headers)
     decoded_access = decode_token(access_token)
 
     if decoded_access is None:
@@ -77,7 +78,7 @@ def re_authenticate(req: _Parsed):
         decoded_refresh = decode_token(refresh_token)
         access, refresh = regenerate_access_token(decoded_refresh)
         if access is None:
-            raise AppException("re-auth")
+            raise AppException("re-auth", code=401)
 
         return json_response(
             {},
@@ -88,18 +89,25 @@ def re_authenticate(req: _Parsed):
         )
 
 
+@require_jwt()
+def get_file_list(request: _Parsed, user: str, creds: CredManager = CredManager):
+    if creds.user is None or (creds.user != user):
+        raise AppException("Not authorized", 403)
+    req = get_user_by_id(user)
+    files = req.files
+    ret = [f.as_json for f in files if f.data_type == "encrypted_blob"]
+
+    return {"files": ret}
+
+
 # creds  will be injected by require_jwt
 @require_jwt(strict=False)
 def get_user_details(request: _Parsed, user: str, creds: CredManager = CredManager):
     current_user = creds.user
-    if user == "me" or current_user == user.lower():
-        if current_user is not None:
-            return self_details(request, creds)
-        raise AppException("Not Authenticated")
-    user_details = get_user_by_id(user)
-    json = user_details.as_json
-    json.pop("_secure_")
-    return {"user_data": json}
+    if current_user is not None and (user == "me" or current_user == user.lower()):
+        return self_details(request, creds)
+
+    raise AppException("Not authorized", 403)
 
 
 def self_details(request: _Parsed, creds: CredManager):
@@ -109,23 +117,6 @@ def self_details(request: _Parsed, creds: CredManager):
 
 
 @require_jwt()
-def edit(request: _Parsed, user: str, creds: CredManager = CredManager):
-    editable_fields = ("email", "school", "name")
-    current_user = creds.user
-    if user != current_user:
-        raise AppException("Cannot edit ( not allowed )")
-    json = request.json
-    edit_field = json.get("field")
-    if edit_field not in editable_fields:
-        raise AppException("Requested field cannot be edited")
-    new_value = json.get("new_value")
-    user_data = get_user_by_id(current_user)
-
-    setattr(user_data, edit_field, new_value)
-    save_to_db()
-    return user_data.as_json
-
-
-@require_jwt()
 def check_auth(creds=CredManager):
-    return {"username": creds.user}
+    user = creds.user
+    return {"user_data": get_user_by_id(user).as_json}
