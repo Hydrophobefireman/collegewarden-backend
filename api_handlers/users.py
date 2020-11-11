@@ -1,7 +1,7 @@
 from flask import request as flask_request
 from psycopg2 import IntegrityError
 
-from app_init import UserTable, File
+from app_init import UserTable, File, db
 from auth_token import (
     issue_access_token,
     issue_refresh_token,
@@ -93,8 +93,13 @@ def re_authenticate(req: _Parsed):
 def get_file_list(request: _Parsed, user: str, creds: CredManager = CredManager):
     if creds.user is None or (creds.user != user):
         raise AppException("Not authorized", 403)
-    files = File.query.filter_by(owner_user=user, data_type="encrypted_blob").all()
-    ret = [f.as_json for f in files if f.data_type == "encrypted_blob"]
+
+    files = (
+        db.session.query(*[c for c in File.__table__.c if c.name != "binary"])
+        .filter(File.owner_user == user, File.data_type == "encrypted_blob")
+        .all()
+    )
+    ret = [f._asdict() for f in files]
 
     return {"files": ret}
 

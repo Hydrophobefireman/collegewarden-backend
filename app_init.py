@@ -27,7 +27,7 @@ db = SQLAlchemy(app)
 
 
 @app.before_request
-@guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=15, per=5)
+@guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=30, per=60)
 def gate_check():
     pass
 
@@ -143,7 +143,7 @@ class File(db.Model):
         binary: bytes = None,
         data_type: str = None,
     ):
-        raise_if_invalid_data(owner_user, file_enc_meta, binary, data_type)
+        raise_if_invalid_data(owner_user, file_enc_meta, data_type)
         self.owner_user = owner_user
         self.file_enc_meta = file_enc_meta
         self.binary = binary
