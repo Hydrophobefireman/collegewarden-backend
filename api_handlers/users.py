@@ -35,6 +35,7 @@ def register(request: _Parsed):
     try:
         user_data = UserTable(user, name, password)
         add_to_db(user_data)
+        print("registered ", user)
         return {"user_data": user_data.as_json}
     except Exception as e:
         if isinstance(getattr(e, "orig", None), IntegrityError):
