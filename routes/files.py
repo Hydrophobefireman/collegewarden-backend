@@ -29,9 +29,9 @@ def get_encrypted_file(file_id):
     return files.get_file(file_id)
 
 
-@app.route("/files/<file_id>/delete/", **POST_REQUEST)
+@app.route("/files/_/delete/", **POST_REQUEST)
 @api_response
-def delete_file(file_id):
+def delete_file():
     return files.delete(ParsedRequest())
 
 
