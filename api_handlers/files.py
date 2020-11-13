@@ -39,6 +39,7 @@ def edit(request: ParsedRequest, file_id: str, creds: CredManager = None):
     file = ensure_file_owner(file_id, creds.user)
     new_data = ensure_limit(request.request.get_data())
     file.binary = new_data
+    file.file_enc_meta = request.headers["x-cw-iv"]
     save_to_db()
     return {"status": True}
 
