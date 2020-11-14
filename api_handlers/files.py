@@ -3,6 +3,15 @@ from base64 import b64decode
 from app_init import File
 from auth_token import require_jwt
 from flask import Response
+from response_caching import (
+    DEFAULT_CACHE_TIMEOUT,
+    cache,
+    cache_data,
+    get_cache,
+    get_cache_response,
+    invalidate,
+    read_cache,
+)
 from util import AppException, ParsedRequest
 
 from .common import (
@@ -41,6 +50,7 @@ def edit(request: ParsedRequest, file_id: str, creds: CredManager = None):
     file.binary = new_data
     file.file_enc_meta = request.headers["x-cw-iv"]
     save_to_db()
+    invalidate(file_id)
     return {"status": True}
 
 
@@ -50,12 +60,20 @@ def delete(request: ParsedRequest, creds: CredManager = None):
     user = creds.user
     file = ensure_file_owner(file_id, user)
     delete_from_db(file)
+    invalidate(file_id)
     return {"status": True}
 
 
 @require_jwt()
 def get_file(file_id: str, creds: CredManager = None):
+    has_cache = get_cache(file_id, DEFAULT_CACHE_TIMEOUT)
+    if has_cache:
+        f_user = get_cache(file_id + "-owner", DEFAULT_CACHE_TIMEOUT)
+        if f_user and read_cache(f_user) == creds.user:
+            return get_cache_response(has_cache)
     file = ensure_file_owner(file_id, creds.user).binary
+    cache_data(file_id, file)
+    cache_data(file_id + "-owner", creds.user.encode())
     return Response(file, headers={"content-type": "application/octet-stream"})
 
 

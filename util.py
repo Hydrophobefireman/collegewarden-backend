@@ -3,15 +3,15 @@
 # ==================================================
 from functools import wraps as _wraps
 from json import dumps as _dumps
+from pathlib import Path
 from re import compile as _compile
 from time import time as _time
 from traceback import print_exc as _print_exc
 
-from flask import request as _request
 from flask import Request as _Request
 from flask import Response as _Response
+from flask import request as _request
 from werkzeug.datastructures import Headers
-
 
 # maybe only strip whitespace?
 _sub = _compile(r"([^\w]|_)").sub
@@ -70,6 +70,17 @@ def api_response(func):
             return json_response({"error": err, "tb": f"{e}"})
 
     return run
+
+
+def safe_mkdir(dir_name: str):
+    Path(dir_name).mkdir(exist_ok=True)
+
+
+def safe_remove(filename: str):
+    try:
+        Path(filename).unlink()
+    except:
+        pass
 
 
 def get_bearer_token(headers: Headers) -> str:
