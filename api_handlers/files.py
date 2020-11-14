@@ -70,7 +70,7 @@ def get_file(file_id: str, creds: CredManager = None):
     if has_cache:
         f_user = get_cache(file_id + "-owner", DEFAULT_CACHE_TIMEOUT)
         if f_user and read_cache(f_user) == creds.user:
-            return get_cache_response(has_cache)
+            return get_cache_response(has_cache, "application/octet-stream")
     file = ensure_file_owner(file_id, creds.user).binary
     cache_data(file_id, file)
     cache_data(file_id + "-owner", creds.user.encode())

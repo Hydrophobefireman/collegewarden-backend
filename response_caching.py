@@ -91,7 +91,11 @@ def cache(key_method, timeout=DEFAULT_CACHE_TIMEOUT):
     def decorator(func):
         @wraps(func)
         def json_cache(*args, **kwargs):
-            key = key_method if isinstance(key_method, str) else key_method(*args)
+            key = (
+                key_method
+                if isinstance(key_method, str)
+                else key_method(*args, **kwargs)
+            )
             has_cache = get_cache(key, timeout)
             if has_cache:
                 resp = get_cache_response(has_cache)
@@ -109,17 +113,17 @@ def read_cache(c, mode="r"):
     return open_and_read(Path(CACHE_DIR) / c, mode=mode)
 
 
-def get_cache_response(has_cache):
+def get_cache_response(has_cache, content_type="application/json"):
     resp = make_response(send_from_directory(CACHE_DIR, has_cache))
-    add_no_cache_headers(resp.headers)
+    add_no_cache_headers(resp.headers, content_type)
     return resp
 
 
-def add_no_cache_headers(headers):
+def add_no_cache_headers(headers, ct):
     # make sure that the browser does not think
     # that this is a static file sent
     # we do not want dynamic content to be cacheable
-    headers["Content-Type"] = "application/json"
+    headers["Content-Type"] = ct
     headers[
         "Cache-Control"
     ] = "no-store, no-cache, must-revalidate, post-check=0, pre-check=0, max-age=0"
