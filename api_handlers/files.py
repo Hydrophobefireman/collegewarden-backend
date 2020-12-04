@@ -9,9 +9,9 @@ from response_caching import (
     cache_data,
     get_cache,
     get_cache_response,
-    invalidate,
-    read_cache,
 )
+from response_caching import invalidate as _invalidate
+from response_caching import read_cache
 from util import AppException, ParsedRequest
 
 from .common import (
@@ -50,8 +50,13 @@ def edit(request: ParsedRequest, file_id: str, creds: CredManager = None):
     file.binary = new_data
     file.file_enc_meta = request.headers["x-cw-iv"]
     save_to_db()
-    invalidate(file_id)
+    invalidate_file(file_id)
     return {"status": True}
+
+
+def invalidate_file(idx):
+    _invalidate(idx)
+    _invalidate(f"owner-of-{idx}")
 
 
 @require_jwt()
@@ -60,7 +65,7 @@ def delete(request: ParsedRequest, creds: CredManager = None):
     user = creds.user
     file = ensure_file_owner(file_id, user)
     delete_from_db(file)
-    invalidate(file_id)
+    invalidate_file(file_id)
     return {"status": True}
 
 
@@ -68,12 +73,12 @@ def delete(request: ParsedRequest, creds: CredManager = None):
 def get_file(file_id: str, creds: CredManager = None):
     has_cache = get_cache(file_id, DEFAULT_CACHE_TIMEOUT)
     if has_cache:
-        f_user = get_cache(file_id + "-owner", DEFAULT_CACHE_TIMEOUT)
+        f_user = get_cache(f"owner-of-{file_id}", DEFAULT_CACHE_TIMEOUT)
         if f_user and read_cache(f_user) == creds.user:
             return get_cache_response(has_cache, "application/octet-stream")
     file = ensure_file_owner(file_id, creds.user).binary
     cache_data(file_id, file)
-    cache_data(file_id + "-owner", creds.user.encode())
+    cache_data(f"owner-of-{file_id}", creds.user.encode())
     return Response(file, headers={"content-type": "application/octet-stream"})
 
 
@@ -91,6 +96,7 @@ def upload_info(request: ParsedRequest, creds: CredManager = None):
         file_data = File(user, iv, file, "encrypted_json")
         user_data.info_dict_id = file_data.file_id
         add_to_db(file_data, True)
+    invalidate_file(file_data.file_id)
     save_to_db()
     return {"success": True}
 
