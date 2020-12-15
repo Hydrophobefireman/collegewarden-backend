@@ -27,7 +27,7 @@ from .cred_manager import CredManager
 def ensure_file_owner(file_id: str, user: str) -> File:
     file = get_file_by_id(file_id)
     if file.owner_user != user:
-        raise AppException("Not authorized to delete this file", code=401)
+        raise AppException("Not authorized to access this file", code=401)
     return file
 
 
