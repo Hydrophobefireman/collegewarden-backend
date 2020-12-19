@@ -51,7 +51,9 @@ def method_not_allowed(e):
     return json_response({"error": "Method not allowed"})
 
 
-EXPOSE_HEADERS = ", ".join(("x-access-token", "x-refresh-token", "x-dynamic"))
+EXPOSE_HEADERS = ", ".join(
+    ("x-access-token", "x-refresh-token", "x-dynamic", "x-file-meta")
+)
 
 
 @app.after_request

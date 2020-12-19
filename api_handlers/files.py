@@ -76,10 +76,17 @@ def get_file(file_id: str, creds: CredManager = None):
         f_user = get_cache(f"owner-of-{file_id}", DEFAULT_CACHE_TIMEOUT)
         if f_user and read_cache(f_user) == creds.user:
             return get_cache_response(has_cache, "application/octet-stream")
-    file = ensure_file_owner(file_id, creds.user).binary
+    F = ensure_file_owner(file_id, creds.user)
+    file = F.binary
     cache_data(file_id, file)
     cache_data(f"owner-of-{file_id}", creds.user.encode())
-    return Response(file, headers={"content-type": "application/octet-stream"})
+    return Response(
+        file,
+        headers={
+            "content-type": "application/octet-stream",
+            "x-file-meta": F.file_enc_meta,
+        },
+    )
 
 
 @require_jwt()
