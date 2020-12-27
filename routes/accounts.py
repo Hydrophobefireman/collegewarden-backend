@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, Response
 
 from api_handlers import users
 from app_init import app
@@ -46,7 +46,7 @@ def user_details(user):
     return users.get_user_details(ParsedRequest(), user)
 
 
-@app.route("/accounts/<user>/files/",strict_slashes=False)
+@app.route("/accounts/<user>/files/", strict_slashes=False)
 @api_response
 def get_files(user):
     return users.get_file_list(ParsedRequest(), user)
@@ -56,3 +56,10 @@ def get_files(user):
 @api_response
 def log_user_out():
     return json_response({}, headers={"x-access-token": "", "x-refresh-token": ""})
+
+
+# debugging, stub for state sync in the future
+@app.route("/_interact/", strict_slashes=False)
+def check_net():
+    print(request.args)
+    return Response("", status=204)
