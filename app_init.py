@@ -161,6 +161,11 @@ class File(db.Model):
             "data_type": self.data_type,
         }
 
+    @validates("owner_user")
+    def _validate_owner_user(self, _, u: str):
+        raise_if_invalid_data(u)
+        return u
+
     @validates("data_type")
     def _validate_data_type(self, _k, t: str):
         if t in (ENCRYPTED_JSON, ENCRYPTED_BLOB):
