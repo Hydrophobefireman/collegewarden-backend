@@ -34,6 +34,12 @@ def refesh_token():
     return users.re_authenticate(ParsedRequest())
 
 
+@app.route("/accounts/password/new/", **POST_REQUEST)
+@api_response
+def reset_password():
+    return users.reset_password(ParsedRequest())
+
+
 # ===========================================================================
 #                                  Users
 

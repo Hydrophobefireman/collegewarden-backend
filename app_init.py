@@ -27,7 +27,7 @@ db = SQLAlchemy(app)
 
 
 @app.before_request
-@guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=30, per=60)
+# @guard(ban_time=5, ip_resolver="heroku" if IS_PROD else None, request_count=30, per=60)
 def gate_check():
     pass
 
@@ -48,7 +48,7 @@ def catch_all(e):
 
 @app.errorhandler(405)
 def method_not_allowed(e):
-    return json_response({"error": "Method not allowed"})
+    return json_response({"error": "Method not allowed"}, 405)
 
 
 EXPOSE_HEADERS = ", ".join(

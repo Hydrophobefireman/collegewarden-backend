@@ -37,8 +37,8 @@ def get_user_by_id(idx: str) -> _U:
 
 def get_file_by_id(idx: str) -> _F:
     if not idx:
-        return _assert_exists(None)
-    return _assert_exists(_F.query.filter_by(file_id=idx).first())
+        return _assert_exists(None, "data")
+    return _assert_exists(_F.query.filter_by(file_id=idx).first(), "file")
 
 
 def _assert_exists(user: _U, name="User"):

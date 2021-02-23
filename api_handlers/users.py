@@ -95,11 +95,13 @@ def get_file_list(request: _Parsed, user: str, creds: CredManager = CredManager)
     if creds.user is None or (creds.user != user):
         raise AppException("Not authorized", 403)
 
+    # pylint: disable=no-member
     files = (
         db.session.query(*[c for c in File.__table__.c if c.name != "binary"])
         .filter(File.owner_user == user, File.data_type == "encrypted_blob")
         .all()
     )
+    # pylint: enable=no-member
     ret = [f._asdict() for f in files]
 
     return {"files": ret}
@@ -125,3 +127,21 @@ def self_details(request: _Parsed, creds: CredManager):
 def check_auth(creds=CredManager):
     user = creds.user
     return {"user_data": get_user_by_id(user).as_json}
+
+
+@require_jwt()
+def reset_password(request: _Parsed, creds=CredManager):
+    user = creds.user
+    js = request.json
+    current_password = js["current_password"]
+    new_password = js["new_password"]
+    u_data = get_user_by_id(user)
+    hashed_pw = u_data.password_hash
+    if not check_password_hash(hashed_pw, current_password):
+        raise AppException("Incorrect Password", 401)
+    u_data.password_hash = new_password
+    save_to_db()
+    return {
+        "user_data": u_data.as_json,
+        "message": "Please do not close the window while CollegeWarden re encrypts your files with the new password",
+    }
