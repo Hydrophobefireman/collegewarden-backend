@@ -69,7 +69,8 @@ def get_token(strict=True):
         return None
     try:
         access = decode(received_access_token)
-    except Exception:
+    except Exception as e:
+        print(e)
         if strict:
             raise AppException("invalid token", 401)
         return None

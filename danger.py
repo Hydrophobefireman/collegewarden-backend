@@ -56,16 +56,21 @@ def create_token(data: dict) -> str:
     if token_type == ACCESS_TOKEN:
         # data['exp'] is JWT Spec for defining expireable tokens
         data["exp"] = _time() + _TOKEN_EXPIRATION_TIME_IN_SECONDS
-    return _encode_token(data, _SIGNING_KEY).decode()
+    return to_str(_encode_token(data, _SIGNING_KEY, algorithm="HS512"))
 
 
 def decode_token(data: str) -> dict:
     try:
-        return _decode_token(data, _SIGNING_KEY)
+        return _decode_token(data, _SIGNING_KEY,algorithms=["HS512"])
     except _EXPIRED:
         return None
-    except:
+    except Exception as e:
+        print(e)
         raise AppException("Invalid token", 400)
+
+
+def to_str(x):
+    return x.decode() if isinstance(x, bytes) else x
 
 
 # =======================================================================
